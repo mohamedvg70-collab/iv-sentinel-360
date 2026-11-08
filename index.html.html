@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>IV Sentinel 360 - Smart Hospital Management Engine</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Tajawal Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        html, body {
+            background-color: #090d16 !important;
+            color: #f1f5f9;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            min-height: 100vh !important;
+            overflow-x: hidden !important;
+            font-family: 'Tajawal', sans-serif;
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .alarm-flash-red {
+            animation: flash-red 1s infinite alternate;
+        }
+        @keyframes flash-red {
+            0% { background-color: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.8); box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
+            100% { background-color: rgba(15, 23, 42, 0.85); border-color: rgba(239, 68, 68, 0.3); box-shadow: none; }
+        }
+        .alarm-flash-purple {
+            animation: flash-purple 1s infinite alternate;
+        }
+        @keyframes flash-purple {
+            0% { background-color: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.8); box-shadow: 0 0 15px rgba(168, 85, 247, 0.4); }
+            100% { background-color: rgba(15, 23, 42, 0.85); border-color: rgba(168, 85, 247, 0.3); box-shadow: none; }
+        }
+        input[type=range] {
+            accent-color: #06b6d4;
+        }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #090d16; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-cyan-500 selection:text-white bg-[#090d16] pb-10">
+
+    <!-- Top Navigation Header -->
+    <header class="border-b border-slate-800/80 bg-slate-900/90 sticky top-0 z-50 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-1">
+            <div class="flex items-center gap-2 overflow-hidden">
+                <div class="p-2 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg shadow-lg shrink-0">
+                    <i data-lucide="activity" class="w-4 h-4 sm:w-6 sm:h-6 text-white"></i>
+                </div>
+                <div class="truncate">
+                    <div class="flex items-center gap-1">
+                        <h1 class="text-xs sm:text-lg font-bold tracking-wide bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent truncate">IV Sentinel 360</h1>
+                        <span class="px-1.5 py-0.2 text-[9px] font-mono bg-cyan-950 text-cyan-400 border border-cyan-800 rounded shrink-0">v2.0 PRO</span>
+                    </div>
+                    <p class="text-[10px] sm:text-xs text-slate-400 truncate">نظام الإدارة الصحية الذكية والمتابعة اللحظية</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 shrink-0">
+                <div id="esp32Badge" class="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] sm:text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    <span id="esp32StateText">ESP32: متصل</span>
+                </div>
+                
+                <button onclick="toggleAudioBuzzer()" id="buzzerToggleBtn" class="flex items-center gap-1 px-2 py-1 text-[10px] sm:text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition">
+                    <i id="buzzerIcon" data-lucide="volume-2" class="w-3.5 h-3.5 text-emerald-400"></i>
+                    <span id="buzzerText" class="hidden sm:inline">الجرس مفعل</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main App Container -->
+    <main class="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-3 sm:py-6 flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+        <!-- Mobile Navigation Tabs -->
+        <div class="lg:hidden col-span-1 flex bg-slate-900/90 p-1 rounded-xl border border-slate-800 gap-1">
+            <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="flex-1 py-1.5 text-[11px] font-bold rounded-lg bg-cyan-600 text-white transition">المتابعة</button>
+            <button onclick="switchTab('controls')" id="tab-btn-controls" class="flex-1 py-1.5 text-[11px] font-bold rounded-lg text-slate-400 transition">تحكم ESP32</button>
+            <button onclick="switchTab('vein')" id="tab-btn-vein" class="flex-1 py-1.5 text-[11px] font-bold rounded-lg text-slate-400 transition">كاشف الوريد</button>
+            <button onclick="switchTab('reports')" id="tab-btn-reports" class="flex-1 py-1.5 text-[11px] font-bold rounded-lg text-slate-400 transition">السجلات والإحصاء</button>
+        </div>
+
+        <!-- Sidebar Navigation (Desktop) -->
+        <aside class="hidden lg:block lg:col-span-3 space-y-4">
+            <nav class="glass-panel rounded-2xl p-3 space-y-1">
+                <button onclick="switchTab('dashboard')" id="side-btn-dashboard" class="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-cyan-500/20 to-blue-500/10 text-cyan-400 border border-cyan-500/30 transition">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                        <span>لوحة المتابعة اللحظية</span>
+                    </div>
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                </button>
+                <button onclick="switchTab('controls')" id="side-btn-controls" class="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 transition">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="sliders" class="w-5 h-5"></i>
+                        <span>لوحة تحكم ESP32 (Live)</span>
+                    </div>
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                </button>
+                <button onclick="switchTab('vein')" id="side-btn-vein" class="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 transition">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="scan" class="w-5 h-5"></i>
+                        <span>وحدة اكتشاف الوريد</span>
+                    </div>
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                </button>
+                <button onclick="switchTab('reports')" id="side-btn-reports" class="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 transition">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="file-text" class="w-5 h-5"></i>
+                        <span>سجل التقارير وإحصاءات الممرضين</span>
+                    </div>
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                </button>
+            </nav>
+
+            <div class="glass-panel rounded-2xl p-4 space-y-3 border border-slate-800">
+                <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <i data-lucide="play-circle" class="w-4 h-4 text-cyan-400"></i>
+                    <span>إدارة الجلسة الطبية</span>
+                </h3>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btnSessionStart" onclick="startSession()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
+                        <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                        <span>بدء</span>
+                    </button>
+                    <button id="btnSessionPause" onclick="pauseSession()" class="px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
+                        <i data-lucide="pause" class="w-3.5 h-3.5"></i>
+                        <span>إيقاف</span>
+                    </button>
+                </div>
+
+                <button onclick="emergencyStop()" class="w-full py-2.5 bg-gradient-to-r from-rose-600 to-red-700 text-white rounded-xl text-xs font-extrabold transition flex items-center justify-center gap-2">
+                    <i data-lucide="octagon-alert" class="w-4 h-4"></i>
+                    <span>إيقاف طوارئ فوري (E-STOP)</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Dynamic Main Content -->
+        <section class="lg:col-span-9 space-y-4">
+
+            <!-- Global Alarm Banner -->
+            <div id="statusAlertBanner" class="p-3 sm:p-4 rounded-xl glass-panel border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all duration-300">
+                <div class="flex items-center gap-2.5">
+                    <div id="statusIconBg" class="p-2 sm:p-3 rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0">
+                        <i id="statusIcon" data-lucide="shield-check" class="w-5 h-5 sm:w-6 sm:h-6"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[11px] text-slate-400">حالة الأولوية:</span>
+                            <span id="statusTitle" class="text-xs sm:text-sm font-bold text-emerald-400">المحلول يعمل بشكل طبيعي</span>
+                        </div>
+                        <p id="statusDesc" class="text-[10px] sm:text-xs text-slate-300 mt-0.5">القراءات الحالية ضمن الحدود المسموح بها.</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <button id="silenceAlarmBtn" onclick="silenceCurrentAlarm()" class="hidden px-2.5 py-1 text-xs font-semibold bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition items-center gap-1">
+                        <i data-lucide="bell-off" class="w-3.5 h-3.5"></i>
+                        <span>كتم الإنذار واستجابة الطاقم</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- TAB 1: DASHBOARD VIEW -->
+            <div id="tab-dashboard" class="space-y-4">
+                
+                <div class="glass-panel rounded-xl p-3 space-y-2 text-xs border border-slate-800">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                        <span class="text-slate-400 text-[11px]">معرف الجلسة والمسؤول</span>
+                        <span class="font-mono text-cyan-400 font-bold text-[11px]">#IVS-000124 | مشرف الطابق: م. أحمد يحيي</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                        <div class="flex justify-between items-center bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                            <span class="text-slate-400">المريض:</span>
+                            <span id="displayPatientName" class="font-bold text-slate-200 truncate">أحمد محمود السعدني</span>
+                        </div>
+                        <div class="flex justify-between items-center bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                            <span class="text-slate-400">الغرفة:</span>
+                            <span id="displayRoomNo" class="font-bold text-slate-200 truncate">غرفة 304 - سرير B</span>
+                        </div>
+                        <div class="flex justify-between items-center bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                            <span class="text-slate-400">المحلول:</span>
+                            <span id="displayFluidType" class="font-bold text-cyan-300 truncate">Normal Saline 0.9%</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-1.5 border-t border-slate-800/80 space-y-1.5">
+                        <span class="text-[10px] font-bold text-cyan-400 block">إدخال / تعديل بيانات المريض:</span>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                            <input type="text" id="inputPatientName" placeholder="اسم المريض" value="أحمد محمود السعدني" oninput="updatePatientDetails()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-cyan-500">
+                            <input type="text" id="inputRoomNo" placeholder="الغرفة والسرير" value="غرفة 304 - سرير B" oninput="updatePatientDetails()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-cyan-500">
+                            <input type="text" id="inputFluidType" placeholder="نوع المحلول" value="Normal Saline 0.9% (500mL)" oninput="updatePatientDetails()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] text-slate-200 focus:outline-none focus:border-cyan-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Metrics Grid -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div class="glass-panel rounded-xl p-3 border border-slate-800">
+                        <div class="flex items-center justify-between text-slate-400 mb-1">
+                            <span class="text-[10px] font-medium">الحجم الكلي</span>
+                            <i data-lucide="droplet" class="w-3.5 h-3.5 text-cyan-400"></i>
+                        </div>
+                        <div class="text-lg font-extrabold text-slate-100 font-mono"><span id="metricTotalVol">500</span> <span class="text-[10px] text-slate-400 font-sans">mL</span></div>
+                    </div>
+
+                    <div class="glass-panel rounded-xl p-3 border border-slate-800">
+                        <div class="flex items-center justify-between text-slate-400 mb-1">
+                            <span class="text-[10px] font-medium">المُعطى</span>
+                            <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-400"></i>
+                        </div>
+                        <div id="metricInfused" class="text-lg font-extrabold text-emerald-400 font-mono">350 <span class="text-[10px] text-slate-400 font-sans">mL</span></div>
+                        <div class="w-full bg-slate-800 h-1 rounded-full mt-1.5 overflow-hidden">
+                            <div id="progressBar" class="bg-emerald-400 h-full transition-all duration-300" style="width: 70%"></div>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel rounded-xl p-3 border border-slate-800">
+                        <div class="flex items-center justify-between text-slate-400 mb-1">
+                            <span class="text-[10px] font-medium">المتبقي</span>
+                            <i data-lucide="pie-chart" class="w-3.5 h-3.5 text-amber-400"></i>
+                        </div>
+                        <div id="metricRemaining" class="text-lg font-extrabold text-amber-400 font-mono">150 <span class="text-[10px] text-slate-400 font-sans">mL</span></div>
+                    </div>
+
+                    <div class="glass-panel rounded-xl p-3 border border-slate-800">
+                        <div class="flex items-center justify-between text-slate-400 mb-1">
+                            <span class="text-[10px] font-medium">التدفق اللحظي</span>
+                            <i data-lucide="gauge" class="w-3.5 h-3.5 text-cyan-400"></i>
+                        </div>
+                        <div id="metricFlowRate" class="text-lg font-extrabold text-cyan-400 font-mono">75 <span class="text-[10px] text-slate-400 font-sans">mL/hr</span></div>
+                    </div>
+                </div>
+
+                <!-- Live Stream Chart -->
+                <div class="glass-panel rounded-xl p-3 sm:p-4 space-y-2">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xs font-bold text-slate-200">الرسم البياني للتدفق والضغط</h2>
+                        <div class="flex items-center gap-2 text-[10px]">
+                            <span class="text-cyan-400">● التدفق</span>
+                            <span class="text-purple-400">● الضغط</span>
+                        </div>
+                    </div>
+                    <div class="h-48 w-full">
+                        <canvas id="liveChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: ESP32 CONTROLS VIEW -->
+            <div id="tab-controls" class="hidden space-y-4">
+                <div class="glass-panel rounded-xl p-4 space-y-4 border border-cyan-500/20">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <h2 class="text-xs sm:text-sm font-bold text-cyan-400 flex items-center gap-1.5">
+                            <i data-lucide="sliders" class="w-4 h-4"></i>
+                            <span>لوحة تحكم وتوجيه الهاردوير (ESP32 Simulator)</span>
+                        </h2>
+                        <button onclick="resetControlsToNormal()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[10px] font-semibold transition border border-slate-700">
+                            إعادة ضبط
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+
+                        <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-200 font-bold">معدل التدفق (Flow Rate)</span>
+                                <span id="ctrlFlowValue" class="font-mono text-xs font-bold text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800">75 mL/hr</span>
+                            </div>
+                            <input type="range" id="sliderFlowRate" min="0" max="150" value="75" step="1" oninput="onFlowSliderChange(this.value)" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                            <div class="flex justify-between text-[9px] text-slate-500 font-mono">
+                                <span>0 (إنذار أحمر - انسداد)</span>
+                                <span>20 (إنذار أصفر - منخفض)</span>
+                                <span>75 (طبيعي)</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-200 font-bold">ضغط الأنبوب (Line Pressure)</span>
+                                <span id="ctrlPressureValue" class="font-mono text-xs font-bold text-purple-400 bg-purple-950 px-2 py-0.5 rounded border border-purple-800">15.0 PSI</span>
+                            </div>
+                            <input type="range" id="sliderPressure" min="0" max="40" value="15" step="0.5" oninput="onPressureSliderChange(this.value)" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                            <div class="flex justify-between text-[9px] text-slate-500 font-mono">
+                                <span>0 PSI</span>
+                                <span>15 (طبيعي)</span>
+                                <span>40 (إنذار أحمر عاجل)</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-200 font-bold">موضِع الإبرة والتسريب</span>
+                                <span id="ctrlLeakBadge" class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">موضع سليم</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="toggleLeakSimulation(false)" id="btnLeakOff" class="flex-1 py-1.5 rounded text-[11px] font-bold bg-cyan-600 text-white transition">سليم (No Leak)</button>
+                                <button onclick="toggleLeakSimulation(true)" id="btnLeakOn" class="flex-1 py-1.5 rounded text-[11px] font-bold bg-slate-800 text-slate-400 hover:bg-slate-700 transition">تحرك الإبرة / انتفاخ</button>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-1.5">
+                            <label class="text-[11px] font-bold text-slate-200 block">سيناريوهات جاهزة:</label>
+                            <div class="grid grid-cols-2 gap-1.5">
+                                <button onclick="applyPreset('normal')" class="p-1.5 text-[10px] rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">طبيعي</button>
+                                <button onclick="applyPreset('low_flow')" class="p-1.5 text-[10px] rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">تدفق منخفض (أصفر)</button>
+                                <button onclick="applyPreset('blocked')" class="p-1.5 text-[10px] rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">انسداد كامل (أحمر)</button>
+                                <button onclick="applyPreset('leak')" class="p-1.5 text-[10px] rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">تسريب إبرة</button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: VEIN FINDER VIEW -->
+            <div id="tab-vein" class="hidden space-y-4">
+                <div class="glass-panel rounded-xl p-4 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-xs sm:text-sm font-bold text-slate-100 flex items-center gap-1.5 truncate">
+                            <i data-lucide="scan" class="w-4 h-4 text-cyan-400 shrink-0"></i>
+                            <span class="truncate">وحدة اكتشاف الوريد (NIR Vein Mapper)</span>
+                        </h2>
+                        <button onclick="scanVeinAnimation()" class="px-2 py-1 bg-cyan-600 text-white rounded text-[10px] font-bold shrink-0">إعادة مسح الذراع</button>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-slate-900/80 p-3 rounded-lg border border-slate-800 text-[11px]">
+                        <div>
+                            <div class="flex justify-between text-[10px] text-slate-300 mb-1">
+                                <span>درجة التباين (Contrast)</span>
+                                <span id="contrastVal" class="font-mono text-cyan-400">120%</span>
+                            </div>
+                            <input type="range" id="sliderContrast" min="50" max="200" value="120" oninput="updateVeinFilters()" class="w-full h-1 bg-slate-800 rounded">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[10px] text-slate-300 mb-1">
+                                <span>فلتر الأشعة NIR</span>
+                                <span id="nirFilterVal" class="font-mono text-cyan-400">850nm</span>
+                            </div>
+                            <input type="range" id="sliderNir" min="700" max="950" value="850" oninput="updateVeinFilters()" class="w-full h-1 bg-slate-800 rounded">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-[10px] text-slate-300 mb-1">
+                                <span>السطوع (Brightness)</span>
+                                <span id="brightVal" class="font-mono text-cyan-400">100%</span>
+                            </div>
+                            <input type="range" id="sliderBright" min="50" max="150" value="100" oninput="updateVeinFilters()" class="w-full h-1 bg-slate-800 rounded">
+                        </div>
+                    </div>
+
+                    <div class="relative bg-slate-950 rounded-xl border border-slate-800 h-64 flex items-center justify-center overflow-hidden">
+                        <svg id="veinCanvasSvg" class="absolute inset-0 w-full h-full text-cyan-400" viewBox="0 0 600 300" fill="none" stroke="currentColor">
+                            <path d="M 40 160 Q 200 130 350 170 T 560 140" stroke-width="9" stroke-linecap="round" class="opacity-90"></path>
+                            <path d="M 210 138 Q 280 85 400 75" stroke-width="5" stroke-linecap="round" class="opacity-70"></path>
+                            <path d="M 350 170 Q 420 230 500 240" stroke-width="5" stroke-linecap="round" class="opacity-70"></path>
+                            <g transform="translate(350, 170)" class="animate-pulse">
+                                <circle r="20" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="3 2" />
+                                <circle r="5" fill="#10b981" />
+                            </g>
+                        </svg>
+                        <div id="veinScanLine" class="absolute top-0 bottom-0 w-1 bg-cyan-400 shadow-[0_0_10px_#22d3ee] hidden"></div>
+                        <div class="absolute top-2 left-2 bg-slate-900/80 px-2 py-0.5 rounded text-[9px] font-mono text-cyan-400">MODE: NIR_850NM_LIVE</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: REPORTS & NURSE STATS VIEW -->
+            <div id="tab-reports" class="hidden space-y-4">
+                <div class="glass-panel rounded-xl p-4 space-y-3">
+                    <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-800 pb-2">
+                        <h2 class="text-xs sm:text-sm font-bold text-slate-100 truncate">سجل الجلسات وإحصاءات استجابة الطاقم الإداري</h2>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button onclick="exportLogsToCSV()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[10px] font-semibold border border-slate-700 transition">تصدير CSV</button>
+                            <button onclick="window.print()" class="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-[10px] font-bold transition">طباعة التقرير</button>
+                        </div>
+                    </div>
+                    
+                    <!-- إحصاءات زمن الاستجابة وعدد مرات التنبيه للممرضين -->
+                    <div class="grid grid-cols-3 gap-2 bg-slate-900/80 p-2.5 rounded-lg border border-slate-800 text-center text-xs">
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">إجمالي التنبيهات</span>
+                            <span id="statTotalAlerts" class="font-bold text-cyan-400 text-sm">3 تنبيهات</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">متوسط زمن الاستجابة</span>
+                            <span class="font-bold text-emerald-400 text-sm">45 ثانية</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">كفاءة الأداء الإداري</span>
+                            <span class="font-bold text-purple-400 text-sm">ممتاز (98%)</span>
+                        </div>
+                    </div>
+
+                    <p class="text-[10px] text-slate-400">حفظ ملخص يومي لكل ممرض عن عدد مرات التنبيه وزمن استجابة الطاقم لتحسين الجودة.</p>
+                    <div class="bg-slate-950 p-3 rounded-lg border border-slate-800 text-[11px] overflow-x-auto">
+                        <table class="w-full text-right">
+                            <thead>
+                                <tr class="bg-slate-900 text-slate-400 border-b border-slate-800">
+                                    <th class="p-2">الوقت (Time)</th>
+                                    <th class="p-2">نوع الحدث والأولوية</th>
+                                    <th class="p-2">التدفق</th>
+                                    <th class="p-2">الضغط</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sessionLogsBody" class="font-mono">
+                                <tr>
+                                    <td class="p-2 text-slate-400">10:30:00 AM</td>
+                                    <td class="p-2 text-emerald-400 font-sans">بدء الجلسة (طبيعي)</td>
+                                    <td class="p-2">75 mL/hr</td>
+                                    <td class="p-2">15.0 PSI</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <footer class="border-t border-slate-800/80 bg-slate-950 py-2 text-center text-[10px] text-slate-500">
+        IV Sentinel 360 • Smart IV Control & Hospital Integration Engine
+    </footer>
+
+    <script>
+        lucide.createIcons();
+
+        let activeTab = 'dashboard';
+        let isAudioBuzzerEnabled = true;
+        let isSessionActive = true;
+        let isSilenced = false;
+        
+        let currentFlowRate = 75;
+        let currentPressure = 15.0;
+        let isLeakActive = false;
+
+        let totalCapacity = 500;
+        let volumeInfused = 350;
+        let totalAlertCount = 3;
+
+        let audioCtx = null;
+        let alarmInterval = null;
+
+        // صفارة طوارئ حقيقية وقوية جداً (High Intensity Hospital Emergency Siren)
+        function playSirenSound() {
+            if (!isAudioBuzzerEnabled || isSilenced) return;
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+
+                let now = audioCtx.currentTime;
+
+                // تذبذب حاد وصارخ (طوارئ مستشفيات حقيقية)
+                let osc1 = audioCtx.createOscillator();
+                let gain1 = audioCtx.createGain();
+                osc1.type = 'sawtooth';
+                osc1.frequency.setValueAtTime(2600, now);
+                osc1.frequency.linearRampToValueAtTime(1400, now + 0.15);
+                
+                gain1.gain.setValueAtTime(3.0, now); // كسب عالي جداً لرفع الصوت لأقصى حد مسموح
+                gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                
+                osc1.connect(gain1);
+                gain1.connect(audioCtx.destination);
+                osc1.start(now);
+                osc1.stop(now + 0.3);
+
+                let osc2 = audioCtx.createOscillator();
+                let gain2 = audioCtx.createGain();
+                osc2.type = 'square';
+                osc2.frequency.setValueAtTime(1800, now + 0.15);
+                osc2.frequency.linearRampToValueAtTime(2400, now + 0.3);
+                
+                gain2.gain.setValueAtTime(3.0, now + 0.15);
+                gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+                
+                osc2.connect(gain2);
+                gain2.connect(audioCtx.destination);
+                osc2.start(now + 0.15);
+                osc2.stop(now + 0.45);
+
+            } catch(e) {}
+        }
+
+        function triggerAlarmBeepLoop() {
+            if (alarmInterval) clearInterval(alarmInterval);
+            alarmInterval = setInterval(() => {
+                if ((currentFlowRate < 30 || currentPressure > 25 || isLeakActive) && !isSilenced) {
+                    playSirenSound();
+                }
+            }, 250);
+        }
+
+        function updatePatientDetails() {
+            const name = document.getElementById('inputPatientName').value;
+            const room = document.getElementById('inputRoomNo').value;
+            const fluid = document.getElementById('inputFluidType').value;
+
+            document.getElementById('displayPatientName').innerText = name || '---';
+            document.getElementById('displayRoomNo').innerText = room || '---';
+            document.getElementById('displayFluidType').innerText = fluid || '---';
+        }
+
+        function toggleAudioBuzzer() {
+            isAudioBuzzerEnabled = !isAudioBuzzerEnabled;
+            const btnText = document.getElementById('buzzerText');
+            const btnIcon = document.getElementById('buzzerIcon');
+
+            if (isAudioBuzzerEnabled) {
+                btnText.innerText = 'الجرس مفعل';
+                btnIcon.setAttribute('data-lucide', 'volume-2');
+                btnIcon.className = 'w-3.5 h-3.5 text-emerald-400';
+            } else {
+                btnText.innerText = 'الجرس مكتوم';
+                btnIcon.setAttribute('data-lucide', 'volume-x');
+                btnIcon.className = 'w-3.5 h-3.5 text-rose-400';
+            }
+            lucide.createIcons();
+        }
+
+        function switchTab(tabId) {
+            activeTab = tabId;
+            ['dashboard', 'controls', 'vein', 'reports'].forEach(id => {
+                const el = document.getElementById(`tab-${id}`);
+                const btnM = document.getElementById(`tab-btn-${id}`);
+                const btnD = document.getElementById(`side-btn-${id}`);
+
+                if (id === tabId) {
+                    el.classList.remove('hidden');
+                    if(btnM) btnM.className = "flex-1 py-1.5 text-[11px] font-bold rounded-lg bg-cyan-600 text-white transition";
+                    if(btnD) btnD.className = "w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-cyan-500/20 to-blue-500/10 text-cyan-400 border border-cyan-500/30 transition";
+                } else {
+                    el.classList.add('hidden');
+                    if(btnM) btnM.className = "flex-1 py-1.5 text-[11px] font-bold rounded-lg text-slate-400 transition";
+                    if(btnD) btnD.className = "w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 transition";
+                }
+            });
+        }
+
+        function onFlowSliderChange(val) {
+            currentFlowRate = parseFloat(val);
+            document.getElementById('ctrlFlowValue').innerText = `${currentFlowRate} mL/hr`;
+            isSilenced = false;
+            evaluateSystemState();
+        }
+
+        function onPressureSliderChange(val) {
+            currentPressure = parseFloat(val);
+            document.getElementById('ctrlPressureValue').innerText = `${currentPressure.toFixed(1)} PSI`;
+            isSilenced = false;
+            evaluateSystemState();
+        }
+
+        function toggleLeakSimulation(state) {
+            isLeakActive = state;
+            const btnOff = document.getElementById('btnLeakOff');
+            const btnOn = document.getElementById('btnLeakOn');
+            const badge = document.getElementById('ctrlLeakBadge');
+
+            if (state) {
+                btnOn.className = "flex-1 py-1.5 rounded text-[11px] font-bold bg-purple-600 text-white transition";
+                btnOff.className = "flex-1 py-1.5 rounded text-[11px] font-bold bg-slate-800 text-slate-400 hover:bg-slate-700 transition";
+                badge.className = "text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30";
+                badge.innerText = "تحرك/تسريب!";
+                addSessionLog("إنذار تسريب (بنفسجي)", `${currentFlowRate} mL/hr`, `${currentPressure} PSI`);
+            } else {
+                btnOff.className = "flex-1 py-1.5 rounded text-[11px] font-bold bg-cyan-600 text-white transition";
+                btnOn.className = "flex-1 py-1.5 rounded text-[11px] font-bold bg-slate-800 text-slate-400 hover:bg-slate-700 transition";
+                badge.className = "text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+                badge.innerText = "موضع سليم";
+            }
+            isSilenced = false;
+            evaluateSystemState();
+        }
+
+        function applyPreset(preset) {
+            if (preset === 'normal') {
+                currentFlowRate = 75; currentPressure = 15.0; isLeakActive = false;
+            } else if (preset === 'low_flow') {
+                currentFlowRate = 20; currentPressure = 18.0; isLeakActive = false;
+                addSessionLog("إنذار أصفر: تدفق منخفض", `${currentFlowRate} mL/hr`, `${currentPressure} PSI`);
+            } else if (preset === 'blocked') {
+                currentFlowRate = 0; currentPressure = 35.0; isLeakActive = false;
+                addSessionLog("إنذار أحمر عاجل: انسداد خط", `${currentFlowRate} mL/hr`, `${currentPressure} PSI`);
+            } else if (preset === 'leak') {
+                currentFlowRate = 65; currentPressure = 10.0; isLeakActive = true;
+                addSessionLog("إنذار تسريب إبرة للأنسجة", `${currentFlowRate} mL/hr`, `${currentPressure} PSI`);
+            }
+
+            document.getElementById('sliderFlowRate').value = currentFlowRate;
+            document.getElementById('ctrlFlowValue').innerText = `${currentFlowRate} mL/hr`;
+            document.getElementById('sliderPressure').value = currentPressure;
+            document.getElementById('ctrlPressureValue').innerText = `${currentPressure.toFixed(1)} PSI`;
+            toggleLeakSimulation(isLeakActive);
+        }
+
+        function resetControlsToNormal() { applyPreset('normal'); }
+
+        // الوقت باللغة الإنجليزية حصرياً
+        function getEnglishTime() {
+            const now = new Date();
+            let hours = now.getHours();
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            const strHours = String(hours).padStart(2, '0');
+            return `${strHours}:${minutes}:${seconds} ${ampm}`;
+        }
+
+        function addSessionLog(eventText, flowText, pressText) {
+            const tbody = document.getElementById('sessionLogsBody');
+            if(!tbody) return;
+            totalAlertCount++;
+            document.getElementById('statTotalAlerts').innerText = `${totalAlertCount} تنبيهات`;
+            
+            const timeStr = getEnglishTime();
+            const tr = document.createElement('tr');
+            tr.className = "border-b border-slate-800/40 hover:bg-slate-900/40 font-mono text-[11px]";
+            tr.innerHTML = `
+                <td class="p-2 text-slate-400">${timeStr}</td>
+                <td class="p-2 text-cyan-300 font-sans font-semibold">${eventText}</td>
+                <td class="p-2">${flowText}</td>
+                <td class="p-2">${pressText}</td>
+            `;
+            tbody.prepend(tr);
+        }
+
+        function evaluateSystemState() {
+            const banner = document.getElementById('statusAlertBanner');
+            const iconBg = document.getElementById('statusIconBg');
+            const icon = document.getElementById('statusIcon');
+            const title = document.getElementById('statusTitle');
+            const desc = document.getElementById('statusDesc');
+            const silenceBtn = document.getElementById('silenceAlarmBtn');
+
+            if (!isSessionActive) {
+                banner.className = "p-3 sm:p-4 rounded-xl glass-panel border border-amber-500/40 bg-amber-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all duration-300";
+                iconBg.className = "p-2 sm:p-3 rounded-lg bg-amber-500/20 text-amber-400";
+                icon.setAttribute('data-lucide', 'pause');
+                title.className = "text-xs sm:text-sm font-bold text-amber-400";
+                title.innerText = "الجلسة موقوفة مؤقتاً";
+                desc.innerText = "تم إيقاف التدفق بواسطة الطاقم الطبي.";
+                silenceBtn.classList.add('hidden');
+                if (alarmInterval) clearInterval(alarmInterval);
+                return;
+            }
+
+            if (isLeakActive) {
+                banner.className = "p-3 sm:p-4 rounded-xl glass-panel border border-purple-500/50 alarm-flash-purple flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all duration-300";
+                iconBg.className = "p-2 sm:p-3 rounded-lg bg-purple-500/20 text-purple-400";
+                icon.setAttribute('data-lucide', 'move');
+                title.className = "text-xs sm:text-sm font-bold text-purple-400";
+                title.innerText = "إنذار تسريب للسائل للأنسجة!";
+                desc.innerText = "رصد تغيرات في التمدد النسيجي. يتطلب معاينة الكانيولا فوراً.";
+                silenceBtn.classList.remove('hidden');
+                triggerAlarmBeepLoop();
+            } else if (currentFlowRate === 0 || currentPressure >= 30) {
+                banner.className = "p-3 sm:p-4 rounded-xl glass-panel border border-rose-500/50 alarm-flash-red flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all duration-300";
+                iconBg.className = "p-2 sm:p-3 rounded-lg bg-rose-500/20 text-rose-400";
+                icon.setAttribute('data-lucide', 'octagon-alert');
+                title.className = "text-xs sm:text-sm font-bold text-rose-400";
+                title.innerText = "إنذار أحمر عاجل: توقف تام للتدفق أو انسداد!";
+                desc.innerText = "تدخلاً فورياً مطلوباً لمنع مضاعفات خطيرة للمريض.";
+                silenceBtn.classList.remove('hidden');
+                triggerAlarmBeepLoop();
+            } else if (currentFlowRate < 30) {
+                banner.className = "p-3 sm:p-4 rounded-xl glass-panel border border-amber-500/40 bg-amber-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all duration-300";
+                iconBg.className = "p-2 sm:p-3 rounded-lg bg-amber-500/20 text-amber-400";
+                icon.setAttribute('data-lucide', 'alert-triangle');
+                title.className = "text-xs sm:text-sm font-bold text-amber-400";
+                title.innerText = "إنذار أصفر: انخفاض معدل التدفق أو اقتراب انتهائه";
+                desc.innerText = "منح الممرض وقتاً كافياً للتحرك وفحص الخط.";
+                silenceBtn.classList.remove('hidden');
+                triggerAlarmBeepLoop();
+            } else {
+                banner.className = "p-3 sm:p-4 rounded-xl glass-panel border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all duration-300";
+                iconBg.className = "p-2 sm:p-3 rounded-lg bg-emerald-500/20 text-emerald-400";
+                icon.setAttribute('data-lucide', 'shield-check');
+                title.className = "text-xs sm:text-sm font-bold text-emerald-400";
+                title.innerText = "المحلول يعمل بشكل طبيعي";
+                desc.innerText = "القراءات الحالية ضمن الحدود المسموح بها.";
+                silenceBtn.classList.add('hidden');
+                if (alarmInterval) clearInterval(alarmInterval);
+            }
+
+            document.getElementById('metricFlowRate').innerHTML = `${currentFlowRate} <span class="text-[10px] text-slate-400 font-sans">mL/hr</span>`;
+            lucide.createIcons();
+        }
+
+        function silenceCurrentAlarm() {
+            isSilenced = true;
+            if (alarmInterval) clearInterval(alarmInterval);
+            document.getElementById('silenceAlarmBtn').classList.add('hidden');
+            addSessionLog("إسكات الإنذار (استجابة الطاقم)", `${currentFlowRate} mL/hr`, `${currentPressure} PSI`);
+        }
+
+        function startSession() { 
+            isSessionActive = true; 
+            addSessionLog("بدء / استئناف الجلسة الطبية", `${currentFlowRate} mL/hr`, `${currentPressure} PSI`);
+            evaluateSystemState(); 
+        }
+        function pauseSession() { 
+            isSessionActive = false; 
+            addSessionLog("إيقاف مؤقت للجلسة", `${currentFlowRate} mL/hr`, `${currentPressure} PSI`);
+            evaluateSystemState(); 
+        }
+        function emergencyStop() { 
+            isSessionActive = false; 
+            currentFlowRate = 0; 
+            document.getElementById('sliderFlowRate').value = 0; 
+            addSessionLog("إيقاف طوارئ فوري (E-STOP)", `0 mL/hr`, `${currentPressure} PSI`);
+            evaluateSystemState(); 
+        }
+
+        function updateVeinFilters() {
+            const c = document.getElementById('sliderContrast').value;
+            const b = document.getElementById('sliderBright').value;
+            const nir = document.getElementById('sliderNir').value;
+            document.getElementById('contrastVal').innerText = `${c}%`;
+            document.getElementById('brightVal').innerText = `${b}%`;
+            document.getElementById('nirFilterVal').innerText = `${nir}nm`;
+            document.getElementById('veinCanvasSvg').style.filter = `contrast(${c}%) brightness(${b}%)`;
+        }
+
+        function scanVeinAnimation() {
+            const line = document.getElementById('veinScanLine');
+            line.classList.remove('hidden');
+            let x = 0;
+            let timer = setInterval(() => {
+                x += 3;
+                line.style.left = x + '%';
+                if (x >= 100) { clearInterval(timer); line.classList.add('hidden'); }
+            }, 15);
+        }
+
+        function exportLogsToCSV() {
+            let csv = "Time,Event,Flow,Pressure\n10:30:00,Start,75 mL/hr,15 PSI\n";
+            let blob = new Blob([csv], { type: 'text/csv' });
+            let url = window.URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url; a.download = 'IV_Sentinel_Hospital_Report.csv'; a.click();
+        }
+
+        let liveChart;
+        function initChart() {
+            const ctx = document.getElementById('liveChart').getContext('2d');
+            liveChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['-9s', '-8s', '-7s', '-6s', '-5s', '-4s', '-3s', '-2s', '-1s', 'الآن'],
+                    datasets: [
+                        { label: 'التدفق', data: [75, 75, 75, 74, 75, 75, 76, 75, 75, 75], borderColor: '#22d3ee', borderWidth: 2, tension: 0.3, pointRadius: 0 },
+                        { label: 'الضغط', data: [15, 15, 15.1, 15, 14.9, 15, 15, 15.1, 15, 15], borderColor: '#c084fc', borderWidth: 2, tension: 0.3, pointRadius: 0 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b', font: { size: 9 } } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b', font: { size: 9 } }, min: 0, max: 120 }
+                    }
+                }
+            });
+
+            setInterval(() => {
+                if (!isSessionActive) return;
+                let fVal = Math.max(0, currentFlowRate + (Math.random() - 0.5) * 1.5);
+                let pVal = Math.max(0, currentPressure + (Math.random() - 0.5) * 0.2);
+
+                liveChart.data.datasets[0].data.shift();
+                liveChart.data.datasets[0].data.push(fVal);
+                liveChart.data.datasets[1].data.shift();
+                liveChart.data.datasets[1].data.push(pVal);
+                liveChart.update('none');
+            }, 1000);
+        }
+
+        window.onload = () => { initChart(); };
+    </script>
+</body>
+</html>
